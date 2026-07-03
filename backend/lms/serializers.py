@@ -26,6 +26,45 @@ class CourseSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class MyCourseListSerializer(serializers.ModelSerializer):
+    progress = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Course
+        fields = [
+            "id",
+            "course_name",
+            "course_code",
+            "description",
+            "thumbnail",
+            "estimated_duration",
+            "created_at",
+            "progress",
+        ]
+
+    def get_progress(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user.is_authenticated:
+            return 0
+        try:
+            student = request.user.student_profile
+        except AttributeError:
+            return 0
+        except Student.DoesNotExist:
+            return 0
+        
+        total_materials = StudyMaterial.objects.filter(module__course=obj).count()
+        if total_materials == 0:
+            return 0
+        completed_materials = MaterialCompletion.objects.filter(
+            student=student,
+            material__module__course=obj,
+            completed=True
+        ).count()
+        return int((completed_materials / total_materials) * 100)
+
+
+
 class ClassroomSerializer(serializers.ModelSerializer):
     course = CourseSerializer(read_only=True)
     faculty = FacultySerializer(read_only=True)
