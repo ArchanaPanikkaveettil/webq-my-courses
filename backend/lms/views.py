@@ -1020,10 +1020,26 @@ class TempResetAdminView(APIView):
         if admin:
             admin.set_password("TempAdmin123!")
             admin.save()
-            return Response({"detail": "Password reset to TempAdmin123!"})
+            msg = "Password reset to TempAdmin123!"
         else:
             User.objects.create_superuser("admin", "admin@example.com", "TempAdmin123!")
-            return Response({"detail": "Superuser 'admin' created successfully with password TempAdmin123!"})
+            msg = "Superuser 'admin' created successfully with password TempAdmin123!"
+
+        # Diagnostics
+        from lms.models import Course, Enrollment, Student
+        diagnostics = {
+            "message": msg,
+            "counts": {
+                "users": User.objects.count(),
+                "students": Student.objects.count(),
+                "courses": Course.objects.count(),
+                "enrollments": Enrollment.objects.count()
+            },
+            "courses": [c.course_name for c in Course.objects.all()],
+            "users": [u.username for u in User.objects.all()],
+            "enrollments": [f"{e.student.user.username} -> {e.course.course_name}" for e in Enrollment.objects.all()[:50]]
+        }
+        return Response(diagnostics)
 
 
 
