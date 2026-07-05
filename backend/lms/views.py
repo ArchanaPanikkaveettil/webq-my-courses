@@ -548,4 +548,150 @@ class SubmitAssignmentView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class DashboardSummaryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            student = request.user.student_profile
+        except (AttributeError, Student.DoesNotExist):
+            return Response(
+                {"detail": "Only students have access to the learning dashboard summary."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        from django.utils import timezone
+        from django.db import models
+        now = timezone.now()
+
+        # Prefetch related data to optimize query and prevent N+1 issue
+        enrollments = Enrollment.objects.filter(student=student).select_related("course")
+        courses = [e.course for e in enrollments]
+        
+        # Calculate statistics
+        total_courses = len(courses)
+        
+        # Study Materials count & completions
+        total_materials = StudyMaterial.objects.filter(module__course__in=courses).count()
+        completed_materials = MaterialCompletion.objects.filter(
+            student=student,
+            material__module__course__in=courses,
+            completed=True
+        ).count()
+        
+        overall_progress = int((completed_materials / total_materials) * 100) if total_materials > 0 else 0
+
+        # Pending assignments
+        total_assignments = Assignment.objects.filter(course__in=courses).count()
+        submitted_assignments = AssignmentSubmission.objects.filter(
+            student=student,
+            assignment__course__in=courses,
+            status__in=["SUBMITTED", "EVALUATED"]
+        ).count()
+        pending_assignments = max(0, total_assignments - submitted_assignments)
+
+        # Upcoming live sessions
+        classrooms = Classroom.objects.filter(enrollments__student=student)
+        upcoming_live_count = LiveSession.objects.filter(
+            models.Q(course__in=courses) &
+            (models.Q(classroom__in=classrooms) | models.Q(classroom__isnull=True)),
+            scheduled_at__gt=now
+        ).count()
+
+        # Recent activities (Completions + Submissions)
+        activities = []
+        completions = MaterialCompletion.objects.filter(
+            student=student,
+            completed=True
+        ).select_related("material", "material__module", "material__module__course").order_by("-completed_at")[:5]
+        for c in completions:
+            activities.append({
+                "type": "material",
+                "title": f"Completed '{c.material.title}'",
+                "timestamp": c.completed_at,
+                "course_name": c.material.module.course.course_name
+            })
+
+        submissions = AssignmentSubmission.objects.filter(
+            student=student,
+            status__in=["SUBMITTED", "EVALUATED"]
+        ).select_related("assignment", "assignment__course").order_by("-submitted_at")[:5]
+        for s in submissions:
+            activities.append({
+                "type": "assignment",
+                "title": f"Submitted '{s.assignment.title}'",
+                "timestamp": s.submitted_at,
+                "course_name": s.assignment.course.course_name
+            })
+
+        activities.sort(key=lambda x: x["timestamp"] if x["timestamp"] else now, reverse=True)
+        recent_activities = activities[:5]
+
+        # Upcoming deadlines (unsubmitted assignments + upcoming live classes)
+        deadlines = []
+        pending_assigns = Assignment.objects.filter(
+            course__in=courses,
+            due_date__gt=now
+        ).exclude(
+            submissions__student=student,
+            submissions__status__in=["SUBMITTED", "EVALUATED"]
+        ).select_related("course").order_by("due_date")[:3]
+        for pa in pending_assigns:
+            deadlines.append({
+                "type": "assignment",
+                "title": pa.title,
+                "due_date": pa.due_date,
+                "course_name": pa.course.course_name
+            })
+
+        upcoming_sessions = LiveSession.objects.filter(
+            models.Q(course__in=courses) &
+            (models.Q(classroom__in=classrooms) | models.Q(classroom__isnull=True)),
+            scheduled_at__gt=now
+        ).select_related("course").order_by("scheduled_at")[:3]
+        for us in upcoming_sessions:
+            deadlines.append({
+                "type": "live_session",
+                "title": us.title,
+                "due_date": us.scheduled_at,
+                "course_name": us.course.course_name
+            })
+
+        deadlines.sort(key=lambda x: x["due_date"])
+        upcoming_deadlines = deadlines[:5]
+
+        # Continue Learning shortcut
+        continue_learning = None
+        for enrollment in enrollments.order_by("enrolled_at"):
+            c = enrollment.course
+            first_incomplete = StudyMaterial.objects.filter(
+                module__course=c
+            ).exclude(
+                completed_by__student=student,
+                completed_by__completed=True
+            ).select_related("module", "module__course").order_by("module__order", "order").first()
+            if first_incomplete:
+                continue_learning = {
+                    "course_id": c.id,
+                    "course_name": c.course_name,
+                    "course_code": c.course_code,
+                    "module_title": first_incomplete.module.title,
+                    "material_title": first_incomplete.title
+                }
+                break
+
+        return Response({
+            "stats": {
+                "total_courses": total_courses,
+                "overall_progress": overall_progress,
+                "completed_materials": completed_materials,
+                "pending_assignments": pending_assignments,
+                "upcoming_live_sessions": upcoming_live_count
+            },
+            "recent_activities": recent_activities,
+            "upcoming_deadlines": upcoming_deadlines,
+            "continue_learning": continue_learning
+        })
+
+
 

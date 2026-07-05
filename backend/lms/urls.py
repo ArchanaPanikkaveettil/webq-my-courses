@@ -18,6 +18,7 @@ from .views import (
     MeView,
     SubmitAssignmentView,
     ChangePasswordView,
+    DashboardSummaryView,
 )
 
 urlpatterns = [
@@ -28,6 +29,7 @@ urlpatterns = [
     path("me/", MeView.as_view(), name="me"),
     path("change-password/", ChangePasswordView.as_view(), name="change-password"),
     path("assignments/<int:pk>/submit/", SubmitAssignmentView.as_view(), name="submit-assignment"),
+    path("dashboard-summary/", DashboardSummaryView.as_view(), name="dashboard-summary"),
 
     # Student personal course access APIs
     path("my-courses/", MyCoursesListView.as_view(), name="my-courses-list"),

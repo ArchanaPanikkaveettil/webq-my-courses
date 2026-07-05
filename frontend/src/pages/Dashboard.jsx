@@ -11,12 +11,14 @@ import Spinner from "../components/ui/Spinner";
 
 // API Call: Fetch my courses
 const fetchMyCourses = () => api.get("my-courses/");
+const fetchDashboardSummary = () => api.get("dashboard-summary/");
 
 export default function Dashboard() {
   const { logout, user } = useContext(AuthContext);
   const navigate = useNavigate();
 
   const { data: courses, loading, error, execute: refetchCourses } = useApi(fetchMyCourses);
+  const { data: summary, loading: summaryLoading, error: summaryError, execute: refetchSummary } = useApi(fetchDashboardSummary);
 
   // UI preferences states
   const [searchQuery, setSearchQuery] = useState("");
@@ -170,6 +172,88 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Dashboard Overview Cards */}
+        {summaryLoading ? (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[1, 2, 3, 4, 5].map((idx) => (
+              <div key={idx} className="bg-white border border-gray-150 rounded-2xl p-5 animate-pulse space-y-3">
+                <div className="h-4 bg-gray-200 rounded w-1/3"></div>
+                <div className="h-8 bg-gray-200 rounded w-2/3"></div>
+              </div>
+            ))}
+          </div>
+        ) : summaryError ? (
+          <div className="text-red-500 text-sm text-left">Failed to load statistics.</div>
+        ) : summary?.stats ? (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <Card hover={false} className="p-5 border border-gray-150 rounded-2xl bg-white text-left shadow-xs flex flex-col justify-between">
+              <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Enrolled Courses</span>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-black text-gray-900">{summary.stats.total_courses}</span>
+                <span className="text-gray-500 text-xs font-semibold">Classes</span>
+              </div>
+            </Card>
+
+            <Card hover={false} className="p-5 border border-gray-150 rounded-2xl bg-white text-left shadow-xs flex flex-col justify-between">
+              <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Overall Progress</span>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-black text-purple-650">{summary.stats.overall_progress}%</span>
+                <span className="text-gray-500 text-xs font-semibold">Average</span>
+              </div>
+            </Card>
+
+            <Card hover={false} className="p-5 border border-gray-150 rounded-2xl bg-white text-left shadow-xs flex flex-col justify-between">
+              <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Completed Lessons</span>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-black text-green-655">{summary.stats.completed_materials}</span>
+                <span className="text-gray-500 text-xs font-semibold">Materials</span>
+              </div>
+            </Card>
+
+            <Card hover={false} className="p-5 border border-gray-150 rounded-2xl bg-white text-left shadow-xs flex flex-col justify-between">
+              <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Pending Assignments</span>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-black text-amber-650">{summary.stats.pending_assignments}</span>
+                <span className="text-gray-500 text-xs font-semibold">Todo</span>
+              </div>
+            </Card>
+
+            <Card hover={false} className="p-5 border border-gray-150 rounded-2xl bg-white text-left shadow-xs flex flex-col justify-between">
+              <span className="text-gray-400 text-xs font-bold uppercase tracking-wider">Upcoming Classes</span>
+              <div className="flex items-baseline gap-2 mt-2">
+                <span className="text-2xl font-black text-indigo-650">{summary.stats.upcoming_live_sessions}</span>
+                <span className="text-gray-500 text-xs font-semibold">Live</span>
+              </div>
+            </Card>
+          </div>
+        ) : null}
+
+        {/* Continue Learning Widget */}
+        {!summaryLoading && summary?.continue_learning && (
+          <Card hover={false} className="p-6 border border-purple-100 bg-purple-50/40 rounded-2xl text-left flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xs">
+            <div className="space-y-1.5 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 text-[9px] font-bold text-purple-700 bg-purple-100 uppercase rounded border border-purple-200">Next Up</span>
+                <span className="text-xs text-purple-600 font-bold uppercase tracking-wide">{summary.continue_learning.course_code}</span>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 leading-snug">
+                {summary.continue_learning.material_title}
+              </h3>
+              <p className="text-gray-500 text-xs font-semibold">
+                Module: {summary.continue_learning.module_title} • {summary.continue_learning.course_name}
+              </p>
+            </div>
+
+            <Button
+              variant="primary"
+              className="py-2 px-6 font-bold text-xs shadow-sm shrink-0 mt-2 md:mt-0"
+              onClick={() => navigate(`/courses/${summary.continue_learning.course_id}`)}
+            >
+              Resume Learning
+            </Button>
+          </Card>
+        )}
+
         {/* Filter Controls & Layout toggler */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
           {/* Search */}
@@ -215,7 +299,15 @@ export default function Dashboard() {
             </div>
 
             {/* Refetch button */}
-            <Button variant="secondary" size="md" className="py-2.5 px-3.5 cursor-pointer" onClick={refetchCourses}>
+            <Button
+              variant="secondary"
+              size="md"
+              className="py-2.5 px-3.5 cursor-pointer"
+              onClick={() => {
+                refetchCourses();
+                refetchSummary();
+              }}
+            >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 8H18.5" />
               </svg>
@@ -392,6 +484,120 @@ export default function Dashboard() {
             })}
           </div>
         )}
+
+        {/* Widgets section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 pt-4">
+          {/* Recent Activity */}
+          <Card hover={false} className="p-6 sm:p-8 border border-gray-150 bg-white rounded-2xl text-left space-y-6">
+            <h3 className="font-bold text-lg text-gray-900 tracking-tight flex items-center gap-2">
+              <svg className="h-5 w-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Recent Activity
+            </h3>
+
+            {summaryLoading ? (
+              <div className="space-y-4 py-2">
+                {[1, 2, 3].map((idx) => (
+                  <div key={idx} className="h-10 bg-gray-100 rounded animate-pulse w-full"></div>
+                ))}
+              </div>
+            ) : !summary?.recent_activities || summary.recent_activities.length === 0 ? (
+              <div className="text-gray-400 text-sm py-4 text-center">No recent activities completed yet. Start learning!</div>
+            ) : (
+              <div className="space-y-4">
+                {summary.recent_activities.map((act, idx) => {
+                  const dateStr = act.timestamp
+                    ? new Date(act.timestamp).toLocaleDateString(undefined, {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })
+                    : "Recently";
+
+                  return (
+                    <div key={idx} className="flex gap-4 items-start border-b border-gray-50 last:border-0 pb-3.5 last:pb-0">
+                      <div className={`p-2 rounded-lg shrink-0 ${
+                        act.type === "material" ? "bg-green-50 text-green-600" : "bg-purple-50 text-purple-600"
+                      }`}>
+                        {act.type === "material" ? (
+                          <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        ) : (
+                          <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-0.5 text-left">
+                        <p className="text-sm font-bold text-gray-900 leading-normal">{act.title}</p>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{act.course_name} • {dateStr}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+
+          {/* Upcoming Deadlines */}
+          <Card hover={false} className="p-6 sm:p-8 border border-gray-150 bg-white rounded-2xl text-left space-y-6">
+            <h3 className="font-bold text-lg text-gray-900 tracking-tight flex items-center gap-2">
+              <svg className="h-5 w-5 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+              Upcoming Deadlines & Sessions
+            </h3>
+
+            {summaryLoading ? (
+              <div className="space-y-4 py-2">
+                {[1, 2, 3].map((idx) => (
+                  <div key={idx} className="h-10 bg-gray-100 rounded animate-pulse w-full"></div>
+                ))}
+              </div>
+            ) : !summary?.upcoming_deadlines || summary.upcoming_deadlines.length === 0 ? (
+              <div className="text-gray-400 text-sm py-4 text-center">No upcoming deadlines or sessions scheduled.</div>
+            ) : (
+              <div className="space-y-4">
+                {summary.upcoming_deadlines.map((dead, idx) => {
+                  const dateStr = dead.due_date
+                    ? new Date(dead.due_date).toLocaleDateString(undefined, {
+                        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })
+                    : "TBD";
+
+                  return (
+                    <div key={idx} className="flex gap-4 items-start border-b border-gray-50 last:border-0 pb-3.5 last:pb-0">
+                      <div className={`p-2 rounded-lg shrink-0 ${
+                        dead.type === "assignment" ? "bg-amber-50 text-amber-600" : "bg-indigo-50 text-indigo-650"
+                      }`}>
+                        {dead.type === "assignment" ? (
+                          <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                        ) : (
+                          <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="flex-1 space-y-0.5 text-left">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-bold text-gray-900 leading-normal">{dead.title}</p>
+                          <span className={`px-2 py-0.5 text-[9px] font-bold rounded ${
+                            dead.type === "assignment" ? "bg-amber-50 text-amber-700 border border-amber-200" : "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                          }`}>
+                            {dead.type === "assignment" ? "Due Date" : "Live Session"}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{dead.course_name} • {dateStr}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        </div>
       </main>
     </div>
   );
