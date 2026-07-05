@@ -120,39 +120,6 @@ class Enrollment(models.Model):
         return f"{self.student.student_id} - {self.course.course_code}"
 
 
-    
-
-
-class Enrollment(models.Model):
-    student = models.ForeignKey(
-        Student,
-        on_delete=models.CASCADE,
-        related_name="enrollments"
-    )
-
-    course = models.ForeignKey(
-        Course,
-        on_delete=models.CASCADE,
-        related_name="enrollments"
-    )
-
-    classroom = models.ForeignKey(
-        Classroom,
-        on_delete=models.SET_NULL,
-        blank=True,
-        null=True,
-        related_name="enrollments"
-    )
-
-    enrolled_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ("student", "course")
-
-    def __str__(self):
-        return f"{self.student.student_id} - {self.course.course_code}"
-
-
 class Module(models.Model):
     course = models.ForeignKey(
         Course,
