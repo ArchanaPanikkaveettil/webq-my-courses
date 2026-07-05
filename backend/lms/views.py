@@ -374,4 +374,60 @@ class MeView(APIView):
             "full_name": f"{user.first_name} {user.last_name}".strip() or user.username
         })
 
+
+class SubmitAssignmentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            student = request.user.student_profile
+        except (AttributeError, Student.DoesNotExist):
+            return Response(
+                {"detail": "Only enrolled students can submit assignments."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            assignment = Assignment.objects.get(pk=pk)
+        except Assignment.DoesNotExist:
+            return Response(
+                {"detail": "Assignment not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Enrolled student validation
+        course = assignment.course
+        is_enrolled = Enrollment.objects.filter(student=student, course=course).exists()
+        if not is_enrolled:
+            return Response(
+                {"detail": "You are not enrolled in the course for this assignment."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        submission, created = AssignmentSubmission.objects.get_or_create(
+            assignment=assignment,
+            student=student
+        )
+
+        # Prevent duplicate submissions if already submitted
+        if not created and submission.status == "SUBMITTED":
+            return Response(
+                {"detail": "Assignment has already been submitted."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        from django.utils import timezone
+        submission.status = "SUBMITTED"
+        submission.submitted_at = timezone.now()
+        submission.save()
+
+        return Response({
+            "id": submission.id,
+            "status": submission.status,
+            "submitted_at": submission.submitted_at,
+            "grade": submission.grade,
+            "feedback": submission.feedback
+        }, status=status.HTTP_200_OK)
+
+
 
