@@ -1025,10 +1025,20 @@ class TempResetAdminView(APIView):
             User.objects.create_superuser("admin", "admin@example.com", "TempAdmin123!")
             msg = "Superuser 'admin' created successfully with password TempAdmin123!"
 
+        # Trigger seeding if no courses exist
+        from django.core.management import call_command
+        from lms.models import Course
+        seeded = False
+        if Course.objects.count() == 0:
+            call_command('seed_data')
+            seeded = True
+            msg = f"Seeded database and {msg}"
+
         # Diagnostics
-        from lms.models import Course, Enrollment, Student
+        from lms.models import Enrollment, Student
         diagnostics = {
             "message": msg,
+            "seeded": seeded,
             "counts": {
                 "users": User.objects.count(),
                 "students": Student.objects.count(),
