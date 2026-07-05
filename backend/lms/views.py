@@ -1016,44 +1016,10 @@ class TempResetAdminView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        from lms.models import Course, Module, StudyMaterial, MaterialCompletion, Assignment, LiveSession, Classroom, Enrollment, Student
-        from django.core.management import call_command
-        from django.contrib.auth.models import User
-        
-        # Superuser
-        admin = User.objects.filter(username="admin").first()
-        if admin:
-            admin.set_password("TempAdmin123!")
-            admin.save()
-            msg = "Admin password reset to TempAdmin123!"
-        else:
-            User.objects.create_superuser("admin", "admin@example.com", "TempAdmin123!")
-            msg = "Admin superuser created with password TempAdmin123!"
+        import os
+        db_url = os.environ.get("DATABASE_URL", "not set")
+        return Response({"db_url": db_url})
 
-        # Seed check (if no courses or no study materials exist)
-        seeded = False
-        if Course.objects.count() == 0 or StudyMaterial.objects.count() == 0:
-            call_command('seed_data')
-            seeded = True
-            msg = f"Seeded database successfully. {msg}"
-
-        diagnostics = {
-            "message": msg,
-            "seeded": seeded,
-            "counts": {
-                "users": User.objects.count(),
-                "students": Student.objects.count(),
-                "courses": Course.objects.count(),
-                "modules": Module.objects.count(),
-                "study_materials": StudyMaterial.objects.count(),
-                "material_completions": MaterialCompletion.objects.count(),
-                "assignments": Assignment.objects.count(),
-                "live_sessions": LiveSession.objects.count(),
-                "classrooms": Classroom.objects.count(),
-                "enrollments": Enrollment.objects.count()
-            }
-        }
-        return Response(diagnostics)
 
 
 
