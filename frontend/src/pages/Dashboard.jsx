@@ -9,12 +9,13 @@ import ProgressBar from "../components/ui/ProgressBar";
 import Badge from "../components/ui/Badge";
 import Spinner from "../components/ui/Spinner";
 
+// API Call: Fetch my courses
+const fetchMyCourses = () => api.get("my-courses/");
+
 export default function Dashboard() {
   const { logout, user } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  // API Call: Fetch my courses
-  const fetchMyCourses = () => api.get("my-courses/");
   const { data: courses, loading, error, execute: refetchCourses } = useApi(fetchMyCourses);
 
   // UI preferences states
@@ -99,10 +100,10 @@ export default function Dashboard() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-sm border border-purple-200">
-                  {user?.username ? user.username[0].toUpperCase() : "S"}
+                  {user?.full_name ? user.full_name[0].toUpperCase() : (user?.username ? user.username[0].toUpperCase() : "S")}
                 </div>
                 <span className="hidden sm:inline text-sm font-semibold text-gray-700">
-                  {user?.username || "Student"}
+                  {user?.full_name || user?.username || "Student"}
                 </span>
               </div>
               <Button variant="secondary" size="sm" className="font-semibold text-xs py-1.5" onClick={handleLogout}>
@@ -123,7 +124,7 @@ export default function Dashboard() {
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-2 text-left">
               <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-                Welcome back, {user?.username || "Student"}!
+                Welcome back, {user?.full_name || user?.username || "Student"}!
               </h1>
               <p className="text-purple-200/90 text-sm sm:text-base">
                 Track your active syllabus, modules, live classes, and achievements here.

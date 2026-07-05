@@ -147,7 +147,7 @@ export default function Landing() {
               <Button variant="ghost" className="hover:text-purple-700 font-bold" onClick={() => navigate("/login")}>
                 Login
               </Button>
-              <Button variant="primary" className="font-bold" onClick={() => navigate("/login")}>
+              <Button variant="primary" className="font-bold" onClick={() => navigate("/register")}>
                 Get Started
               </Button>
             </div>
@@ -181,10 +181,10 @@ export default function Landing() {
               A comprehensive student Learning Management System designed to streamline virtual education. View your enrolled classes, engage in live sessions, download materials, track completions, and submit assignments within a single modern dashboard.
             </p>
             <div className="flex flex-wrap justify-center lg:justify-start gap-4">
-              <Button size="lg" variant="primary" className="px-8 py-3 text-base shadow-xl shadow-purple-200/50 hover:shadow-purple-200/80" onClick={() => navigate("/login")}>
+              <Button size="lg" variant="primary" className="px-8 py-3 text-base shadow-xl shadow-purple-200/50 hover:shadow-purple-200/80" onClick={() => navigate("/register")}>
                 Get Started Now
               </Button>
-              <Button size="lg" variant="secondary" className="px-8 py-3 text-base" onClick={() => navigate("/login")}>
+              <Button size="lg" variant="secondary" className="px-8 py-3 text-base" onClick={() => navigate("/register")}>
                 Sign In to Portal
               </Button>
             </div>

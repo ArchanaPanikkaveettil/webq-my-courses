@@ -208,8 +208,16 @@ export default function Login() {
             </Button>
           </form>
 
+          {/* Register Link */}
+          <div className="text-center pt-1 text-sm text-gray-500">
+            Don't have an account?{" "}
+            <Link to="/register" className="font-semibold text-purple-600 hover:text-purple-700 transition-colors">
+              Register
+            </Link>
+          </div>
+
           {/* Home Link */}
-          <div className="text-center pt-2">
+          <div className="text-center pt-1">
             <Link to="/" className="text-xs font-semibold text-gray-500 hover:text-purple-600 transition-colors inline-flex items-center gap-1.5 group">
               <svg className="h-4 w-4 transform group-hover:-translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />

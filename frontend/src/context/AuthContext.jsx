@@ -26,10 +26,9 @@ export default function AuthProvider({ children }) {
     const fetchUserProfile = async () => {
       if (token) {
         try {
-          // Call my-courses endpoint to verify token validity
-          await api.get("my-courses/");
-          // Token is valid, configure base user details
-          setUser({ username: "Enrolled Student" });
+          // Call me/ endpoint to verify token and retrieve user details
+          const response = await api.get("me/");
+          setUser(response.data);
         } catch (error) {
           console.error("Token verification failed:", error);
           logout();

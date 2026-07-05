@@ -281,4 +281,97 @@ class AssignmentListView(generics.ListAPIView):
 
 class LiveSessionListView(generics.ListAPIView):
     queryset = LiveSession.objects.all()
-    serializer_class = LiveSessionSerializer
+    serializer_class = LiveSessionSerializer
+
+
+# -------------------------
+# Registration API
+# -------------------------
+from rest_framework.permissions import AllowAny
+from django.contrib.auth.models import User
+import random
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        username = request.data.get("username")
+        password = request.data.get("password")
+        email = request.data.get("email")
+        name = request.data.get("name", "")
+
+        if not username or not password or not email:
+            return Response(
+                {"detail": "Username, password and email are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if User.objects.filter(username=username).exists():
+            return Response(
+                {"detail": "Username already exists."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if User.objects.filter(email=email).exists():
+            return Response(
+                {"detail": "Email already exists."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        parts = name.split(" ", 1)
+        first_name = parts[0] if parts else ""
+        last_name = parts[1] if len(parts) > 1 else ""
+
+        try:
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name
+            )
+            
+            # Generate student ID: e.g. STU12345
+            student_id = f"STU{random.randint(100, 99999):05d}"
+            while Student.objects.filter(student_id=student_id).exists():
+                student_id = f"STU{random.randint(100, 99999):05d}"
+                
+            student = Student.objects.create(user=user, student_id=student_id)
+            
+            # Enroll in all existing courses
+            for course in Course.objects.all():
+                classroom = Classroom.objects.filter(course=course).first()
+                Enrollment.objects.get_or_create(student=student, course=course, classroom=classroom)
+                
+            return Response(
+                {"detail": "Student registered and enrolled successfully!"},
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            return Response(
+                {"detail": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class MeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        try:
+            student = user.student_profile
+            student_id = student.student_id
+        except Student.DoesNotExist:
+            student_id = None
+
+        return Response({
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "student_id": student_id,
+            "full_name": f"{user.first_name} {user.last_name}".strip() or user.username
+        })
+
+

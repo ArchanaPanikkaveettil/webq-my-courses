@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import api from "../api/axios";
 import Button from "../components/ui/Button";
 import Card from "../components/ui/Card";
 import heroIllustration from "../assets/hero_illustration.png";
@@ -16,7 +17,7 @@ export default function Register() {
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
@@ -28,14 +29,25 @@ export default function Register() {
 
     setLoading(true);
 
-    // Mock register success since backend does not provide a register API
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await api.post("register/", {
+        username,
+        email,
+        password,
+        name,
+      });
+
       setSuccess("Account successfully registered! Redirecting to login...");
       setTimeout(() => {
         navigate("/login");
       }, 2000);
-    }, 1000);
+    } catch (err) {
+      console.error(err);
+      const errMsg = err.response?.data?.detail || "Registration failed. Please check your details and try again.";
+      setError(errMsg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
