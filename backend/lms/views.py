@@ -55,7 +55,31 @@ class MyCoursesListView(APIView):
             )
         
         courses = Course.objects.filter(enrollments__student=student).distinct()
-        serializer = MyCourseListSerializer(courses, many=True, context={"request": request})
+
+        from django.db.models import Count
+        total_counts = {
+            item["module__course_id"]: item["total"]
+            for item in StudyMaterial.objects.filter(module__course__in=courses)
+            .values("module__course_id")
+            .annotate(total=Count("id"))
+        }
+
+        completed_counts = {
+            item["material__module__course_id"]: item["completed_count"]
+            for item in MaterialCompletion.objects.filter(student=student, completed=True)
+            .values("material__module__course_id")
+            .annotate(completed_count=Count("id"))
+        }
+
+        serializer = MyCourseListSerializer(
+            courses,
+            many=True,
+            context={
+                "request": request,
+                "total_counts": total_counts,
+                "completed_counts": completed_counts
+            }
+        )
         return Response(serializer.data)
 
 
@@ -72,7 +96,7 @@ class MyCourseDetailView(APIView):
             )
         
         # IDOR check: Is student enrolled in the requested course?
-        enrollment = Enrollment.objects.filter(student=student, course_id=pk).first()
+        enrollment = Enrollment.objects.filter(student=student, course_id=pk).select_related("classroom", "classroom__faculty").first()
         if not enrollment:
             return Response(
                 {"detail": "You are not enrolled in this course."},

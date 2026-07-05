@@ -44,14 +44,21 @@ class MyCourseListSerializer(serializers.ModelSerializer):
         ]
 
     def get_progress(self, obj):
+        total_counts = self.context.get("total_counts")
+        completed_counts = self.context.get("completed_counts")
+        if total_counts is not None and completed_counts is not None:
+            total = total_counts.get(obj.id, 0)
+            if total == 0:
+                return 0
+            completed = completed_counts.get(obj.id, 0)
+            return int((completed / total) * 100)
+
         request = self.context.get("request")
         if not request or not request.user.is_authenticated:
             return 0
         try:
             student = request.user.student_profile
-        except AttributeError:
-            return 0
-        except Student.DoesNotExist:
+        except (AttributeError, Student.DoesNotExist):
             return 0
         
         total_materials = StudyMaterial.objects.filter(module__course=obj).count()

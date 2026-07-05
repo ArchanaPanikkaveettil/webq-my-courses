@@ -18,18 +18,74 @@ api.interceptors.request.use(
   }
 );
 
-// Response Interceptor: Catch 401 unauthorized to clear local storage
+// Response Interceptor: Catch 401 unauthorized to refresh token and retry requests
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach((prom) => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  failedQueue = [];
+};
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem("accessToken");
-      localStorage.removeItem("refreshToken");
-      
-      // Exclude token endpoint from triggering automatic redirect
-      const isLoginRequest = error.config && error.config.url && error.config.url.includes("token/");
-      if (!isLoginRequest && window.location.pathname !== "/login") {
-        window.location.href = "/login";
+  async (error) => {
+    const originalRequest = error.config;
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      const isLoginRequest = originalRequest.url && (originalRequest.url.includes("token/") || originalRequest.url.includes("register/"));
+      if (isLoginRequest) {
+        return Promise.reject(error);
+      }
+
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`;
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = localStorage.getItem("refreshToken");
+      if (refreshToken) {
+        try {
+          const res = await axios.post("http://127.0.0.1:8000/api/token/refresh/", {
+            refresh: refreshToken,
+          });
+          const { access } = res.data;
+          localStorage.setItem("accessToken", access);
+          api.defaults.headers.common["Authorization"] = `Bearer ${access}`;
+          originalRequest.headers.Authorization = `Bearer ${access}`;
+          processQueue(null, access);
+          isRefreshing = false;
+          return api(originalRequest);
+        } catch (refreshError) {
+          processQueue(refreshError, null);
+          isRefreshing = false;
+          localStorage.removeItem("accessToken");
+          localStorage.removeItem("refreshToken");
+          if (window.location.pathname !== "/login") {
+            window.location.href = "/login";
+          }
+          return Promise.reject(refreshError);
+        }
+      } else {
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);
