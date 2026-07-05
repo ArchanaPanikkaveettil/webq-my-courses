@@ -22,6 +22,8 @@ export default function CourseDetails() {
   const [toggleLoading, setToggleLoading] = useState({});
   const [activeTab, setActiveTab] = useState("syllabus");
   const [submitting, setSubmitting] = useState({});
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
 
   const handleAssignSubmit = async (assignmentId) => {
     if (submitting[assignmentId]) return;
@@ -87,6 +89,29 @@ export default function CourseDetails() {
       }
     }
     return null;
+  };
+
+  const getSessionStatus = (session) => {
+    const now = new Date();
+    const start = new Date(session.scheduled_at);
+    const end = new Date(start.getTime() + session.duration_minutes * 60 * 1000);
+
+    if (now >= start && now <= end) {
+      return { label: "Live", type: "success", isLive: true, isCompleted: false };
+    } else if (now < start) {
+      return { label: "Upcoming", type: "purple", isLive: false, isCompleted: false };
+    } else {
+      return { label: "Completed", type: "neutral", isLive: false, isCompleted: true };
+    }
+  };
+
+  const handleJoinSession = (session) => {
+    if (!session.meeting_link || session.meeting_link.trim() === "" || session.meeting_link.includes("placeholder")) {
+      setSelectedSession(session);
+      setIsSessionModalOpen(true);
+    } else {
+      window.open(session.meeting_link, "_blank");
+    }
   };
 
   const handleOpenMaterial = (material) => {
@@ -520,38 +545,81 @@ export default function CourseDetails() {
                 ) : (
                   <div className="space-y-6">
                     {course.live_sessions.map((session) => {
-                      const formattedTime = new Date(session.scheduled_time).toLocaleDateString(undefined, {
-                        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                      const statusInfo = getSessionStatus(session);
+                      
+                      const startDate = new Date(session.scheduled_at);
+                      const endDate = new Date(startDate.getTime() + session.duration_minutes * 60 * 1000);
+                      
+                      const formattedDate = startDate.toLocaleDateString(undefined, {
+                        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
                       });
-                      const isUpcoming = new Date(session.scheduled_time) > new Date();
+                      const formattedStartTime = startDate.toLocaleTimeString(undefined, {
+                        hour: '2-digit', minute: '2-digit'
+                      });
+                      const formattedEndTime = endDate.toLocaleTimeString(undefined, {
+                        hour: '2-digit', minute: '2-digit'
+                      });
+
+                      const facultyName = course.faculty ? course.faculty.name : "Course Instructor";
 
                       return (
-                        <div key={session.id} className="p-5 border border-gray-200/80 rounded-xl bg-white shadow-xs flex flex-wrap items-center justify-between gap-4">
-                          <div className="space-y-1">
-                            <h3 className="font-bold text-gray-900 text-base sm:text-lg">{session.title}</h3>
-                            <div className="flex items-center gap-1.5 text-xs text-gray-400 font-semibold">
-                              <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span>Scheduled: {formattedTime}</span>
+                        <div key={session.id} className="p-5 border border-gray-200/80 rounded-xl bg-white shadow-xs space-y-4">
+                          <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div className="space-y-1 text-left">
+                              <h3 className="font-bold text-gray-900 text-base sm:text-lg">{session.title}</h3>
+                              <p className="text-xs text-gray-400 font-semibold flex items-center gap-1">
+                                <span className="uppercase text-purple-600 font-bold">Host:</span> {facultyName}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {statusInfo.isLive && (
+                                <span className="flex h-2.5 w-2.5 relative">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                                </span>
+                              )}
+                              <Badge type={statusInfo.type} className="font-bold text-xs uppercase px-3 py-1">
+                                {statusInfo.label}
+                              </Badge>
                             </div>
                           </div>
-                          
-                          <div className="flex items-center gap-3">
-                            <Badge type={isUpcoming ? "purple" : "neutral"} className="font-bold text-xs uppercase px-2.5 py-0.5">
-                              {isUpcoming ? "Upcoming" : "Ended"}
-                            </Badge>
+
+                          {/* Session details */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-3.5 border-y border-gray-50 text-sm text-gray-600">
+                            <div className="flex items-center gap-2 text-left">
+                              <svg className="h-4.5 w-4.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                              </svg>
+                              <span>{formattedDate}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-left">
+                              <svg className="h-4.5 w-4.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span>{formattedStartTime} - {formattedEndTime}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-left">
+                              <svg className="h-4.5 w-4.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              <span>{session.duration_minutes} Mins</span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+                            <p className="text-gray-500 text-xs sm:text-sm max-w-md text-left leading-normal">
+                              Join this live interactive session with your instructor to review recent topics, ask questions, and clarify concepts.
+                            </p>
                             
-                            {session.meeting_link && (
-                              <Button
-                                variant="secondary"
-                                size="sm"
-                                className="font-bold text-xs py-1.5 px-3"
-                                onClick={() => window.open(session.meeting_link, "_blank")}
-                              >
-                                Join Meeting
-                              </Button>
-                            )}
+                            <Button
+                              variant={statusInfo.isCompleted ? "secondary" : "primary"}
+                              size="sm"
+                              className="font-bold text-xs py-2 px-5 shadow-sm"
+                              disabled={statusInfo.isCompleted}
+                              onClick={() => handleJoinSession(session)}
+                            >
+                              {statusInfo.isCompleted ? "Ended" : "Join Meeting"}
+                            </Button>
                           </div>
                         </div>
                       );
@@ -662,6 +730,30 @@ export default function CourseDetails() {
           </p>
           <div className="pt-2">
             <Button variant="primary" className="px-6 py-2 text-sm font-semibold" onClick={() => setIsModalOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Live Session Modal */}
+      <Modal
+        isOpen={isSessionModalOpen}
+        onClose={() => setIsSessionModalOpen(false)}
+        title={selectedSession ? selectedSession.title : "Live Session"}
+      >
+        <div className="space-y-4 text-center py-6">
+          <div className="h-16 w-16 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h4 className="text-lg font-bold text-gray-900">Meeting Link Pending</h4>
+          <p className="text-gray-500 text-sm max-w-sm mx-auto leading-relaxed">
+            The meeting link for <strong>{selectedSession?.title}</strong> has not yet been published by the instructor. Please check back 5-10 minutes before the scheduled start time.
+          </p>
+          <div className="pt-2">
+            <Button variant="primary" className="px-6 py-2 text-sm font-semibold" onClick={() => setIsSessionModalOpen(false)}>
               Close
             </Button>
           </div>
