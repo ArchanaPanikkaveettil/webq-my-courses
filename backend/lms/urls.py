@@ -23,7 +23,6 @@ from .views import (
     NotificationListView,
     MarkNotificationReadView,
     MarkAllNotificationsReadView,
-    TempResetAdminView,
 )
 
 urlpatterns = [
@@ -39,7 +38,6 @@ urlpatterns = [
     path("notifications/", NotificationListView.as_view(), name="notification-list"),
     path("notifications/<int:pk>/read/", MarkNotificationReadView.as_view(), name="notification-read"),
     path("notifications/read-all/", MarkAllNotificationsReadView.as_view(), name="notifications-read-all"),
-    path("temp-reset-admin/", TempResetAdminView.as_view(), name="temp-reset-admin"),
 
     # Student personal course access APIs
     path("my-courses/", MyCoursesListView.as_view(), name="my-courses-list"),

@@ -1012,45 +1012,6 @@ class MarkAllNotificationsReadView(APIView):
         return Response({"detail": "All notifications marked as read."}, status=status.HTTP_200_OK)
 
 
-class TempResetAdminView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        admin = User.objects.filter(username="admin").first()
-        if admin:
-            admin.set_password("TempAdmin123!")
-            admin.save()
-            msg = "Password reset to TempAdmin123!"
-        else:
-            User.objects.create_superuser("admin", "admin@example.com", "TempAdmin123!")
-            msg = "Superuser 'admin' created successfully with password TempAdmin123!"
-
-        # Trigger seeding if no courses exist
-        from django.core.management import call_command
-        from lms.models import Course
-        seeded = False
-        if Course.objects.count() == 0:
-            call_command('seed_data')
-            seeded = True
-            msg = f"Seeded database and {msg}"
-
-        # Diagnostics
-        from lms.models import Enrollment, Student
-        diagnostics = {
-            "message": msg,
-            "seeded": seeded,
-            "counts": {
-                "users": User.objects.count(),
-                "students": Student.objects.count(),
-                "courses": Course.objects.count(),
-                "enrollments": Enrollment.objects.count()
-            },
-            "courses": [c.course_name for c in Course.objects.all()],
-            "users": [u.username for u in User.objects.all()],
-            "enrollments": [f"{e.student.user.username} -> {e.course.course_name}" for e in Enrollment.objects.all()[:50]]
-        }
-        return Response(diagnostics)
-
 
 
 
