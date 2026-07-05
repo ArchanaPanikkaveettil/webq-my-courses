@@ -10,6 +10,8 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
+import dj_database_url
 from pathlib import Path
 from datetime import timedelta
 
@@ -21,12 +23,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-9#3l^a1q+^wm5uqm$-pyb5k_g5f_535+-l9lr@$hd3mz(v-mki'
+SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-9#3l^a1q+^wm5uqm$-pyb5k_g5f_535+-l9lr@$hd3mz(v-mki")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "True").lower() in ("true", "1", "t")
 
-ALLOWED_HOSTS = []
+# Parse ALLOWED_HOSTS from an environment variable (comma-separated list)
+allowed_hosts_env = os.environ.get("ALLOWED_HOSTS")
+if allowed_hosts_env:
+    ALLOWED_HOSTS = [host.strip() for host in allowed_hosts_env.split(",") if host.strip()]
+else:
+    ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
 
 
 # Application definition
@@ -50,6 +57,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # Must be at the top to catch headers first
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -82,10 +90,9 @@ WSGI_APPLICATION = 'my_courses_backend.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    "default": dj_database_url.config(
+        default=os.environ.get("DATABASE_URL", f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+    )
 }
 
 
@@ -123,7 +130,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Configure WhiteNoise Storage for compression and caching of static files
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -132,10 +143,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS Configuration
 # Specifies which frontend origins are allowed to make API requests to this backend.
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
+cors_allowed_origins_env = os.environ.get("CORS_ALLOWED_ORIGINS")
+if cors_allowed_origins_env:
+    CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_allowed_origins_env.split(",") if origin.strip()]
+else:
+    CORS_ALLOWED_ORIGINS = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
 # Django REST Framework Configuration
 # Sets JWT authentication and requires authentication for all API endpoints by default.
