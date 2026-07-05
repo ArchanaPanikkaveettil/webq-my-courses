@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import useApi from "../hooks/useApi";
 import api from "../api/axios";
 import Button from "../components/ui/Button";
@@ -24,6 +24,21 @@ export default function CourseDetails() {
   const [submitting, setSubmitting] = useState({});
   const [selectedSession, setSelectedSession] = useState(null);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location]);
+
+  // Tabbed Filters
+  const [moduleFilter, setModuleFilter] = useState("all");
+  const [materialFilter, setMaterialFilter] = useState("all");
+  const [materialTypeFilter, setMaterialTypeFilter] = useState("all");
+  const [assignmentFilter, setAssignmentFilter] = useState("all");
+  const [liveSessionFilter, setLiveSessionFilter] = useState("all");
 
   const handleAssignSubmit = async (assignmentId) => {
     if (submitting[assignmentId]) return;
@@ -295,13 +310,113 @@ export default function CourseDetails() {
                     <Badge type="purple" className="font-bold">{totalModules} Modules</Badge>
                   </div>
 
-                  {totalModules === 0 ? (
-                    <div className="text-gray-500 text-sm text-center py-6">No modules registered for this course yet.</div>
-                  ) : (
-                    <div className="space-y-4">
-                      {course.modules.map((mod, idx) => {
-                        const isCompleted = mod.materials && mod.materials.length > 0 && mod.materials.every(m => m.completed);
-                        const isExpanded = !!expandedModules[mod.id];
+                  {/* Modules local filters */}
+                  <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-gray-150 space-y-4 text-left">
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Smart Filters</span>
+                      {(moduleFilter !== "all" || materialFilter !== "all" || materialTypeFilter !== "all") && (
+                        <button
+                          onClick={() => {
+                            setModuleFilter("all");
+                            setMaterialFilter("all");
+                            setMaterialTypeFilter("all");
+                          }}
+                          className="text-xs text-purple-650 hover:text-purple-800 font-bold flex items-center gap-1 cursor-pointer"
+                        >
+                          Clear Filters
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                      {/* Module Status Selector */}
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-gray-400 uppercase tracking-wide block">Modules</label>
+                        <select
+                          value={moduleFilter}
+                          onChange={(e) => setModuleFilter(e.target.value)}
+                          className="w-full bg-white border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-purple-500 font-semibold text-gray-700"
+                        >
+                          <option value="all">All Modules</option>
+                          <option value="completed">Completed</option>
+                          <option value="incomplete">Incomplete</option>
+                        </select>
+                      </div>
+
+                      {/* Materials Status Selector */}
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-gray-400 uppercase tracking-wide block">Materials Status</label>
+                        <select
+                          value={materialFilter}
+                          onChange={(e) => setMaterialFilter(e.target.value)}
+                          className="w-full bg-white border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-purple-500 font-semibold text-gray-700"
+                        >
+                          <option value="all">All Statuses</option>
+                          <option value="completed">Completed Only</option>
+                          <option value="pending">Pending Only</option>
+                        </select>
+                      </div>
+
+                      {/* Materials Type Selector */}
+                      <div className="space-y-1.5">
+                        <label className="font-bold text-gray-400 uppercase tracking-wide block">Materials Type</label>
+                        <select
+                          value={materialTypeFilter}
+                          onChange={(e) => setMaterialTypeFilter(e.target.value)}
+                          className="w-full bg-white border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-1 focus:ring-purple-500 font-semibold text-gray-700"
+                        >
+                          <option value="all">All Types</option>
+                          <option value="PDF">PDF Documents</option>
+                          <option value="VIDEO">Video Lessons</option>
+                          <option value="NOTE">Lecture Notes</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const filteredModules = (course.modules || [])
+                      .map((mod) => {
+                        const filteredMaterials = (mod.materials || []).filter((material) => {
+                          let matchesStatus = true;
+                          if (materialFilter === "completed") {
+                            matchesStatus = material.completed;
+                          } else if (materialFilter === "pending") {
+                            matchesStatus = !material.completed;
+                          }
+
+                          let matchesType = true;
+                          if (materialTypeFilter !== "all") {
+                            matchesType = material.material_type === materialTypeFilter;
+                          }
+
+                          return matchesStatus && matchesType;
+                        });
+
+                        const originalCompleted = mod.materials && mod.materials.length > 0 && mod.materials.every(m => m.completed);
+
+                        return {
+                          ...mod,
+                          materials: filteredMaterials,
+                          isCompleted: originalCompleted
+                        };
+                      })
+                      .filter((mod) => {
+                        if (moduleFilter === "completed") {
+                          return mod.isCompleted;
+                        } else if (moduleFilter === "incomplete") {
+                          return !mod.isCompleted;
+                        }
+                        return true;
+                      });
+
+                    return filteredModules.length === 0 ? (
+                      <div className="text-gray-500 text-sm text-center py-6">No matching modules or materials found.</div>
+                    ) : (
+                      <div className="space-y-4">
+                        {filteredModules.map((mod, idx) => {
+                          const isCompleted = mod.isCompleted;
+                          const isExpanded = !!expandedModules[mod.id];
 
                         return (
                           <div 
@@ -425,9 +540,10 @@ export default function CourseDetails() {
                             )}
                           </div>
                         );
-                      })}
-                    </div>
-                  )}
+                        })}
+                      </div>
+                    );
+                  })()}
                 </Card>
               </>
             )}
@@ -436,103 +552,149 @@ export default function CourseDetails() {
               <Card hover={false} className="p-8 border border-gray-150 rounded-2xl shadow-xs bg-white text-left">
                 <h2 className="text-xl font-bold text-gray-900 mb-6 tracking-tight">Course Assignments</h2>
 
-                {!course.assignments || course.assignments.length === 0 ? (
-                  <div className="text-gray-500 text-sm text-center py-8">No assignments registered for this course yet.</div>
-                ) : (
-                  <div className="space-y-6">
-                    {course.assignments.map((assign) => {
-                      const getAssignmentStatus = (item) => {
-                        const sub = item.submission;
-                        if (sub) {
-                          if (sub.status === "EVALUATED") {
-                            return {
-                              label: `Evaluated (Grade: ${sub.grade})`,
-                              type: "success",
-                              isSubmitted: true
-                            };
+                {/* Assignments local filters */}
+                <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-gray-150 flex flex-wrap items-center justify-between gap-4 text-left">
+                  <div className="flex bg-gray-150 rounded-lg p-0.5 border border-gray-200/50">
+                    {["all", "pending", "submitted", "late", "graded"].map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setAssignmentFilter(f)}
+                        className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer capitalize ${
+                          assignmentFilter === f ? "bg-white text-purple-650 shadow-xs" : "text-gray-500 hover:text-gray-700"
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                  {assignmentFilter !== "all" && (
+                    <button
+                      onClick={() => setAssignmentFilter("all")}
+                      className="text-xs text-purple-650 hover:text-purple-800 font-bold cursor-pointer"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+
+                {(() => {
+                  const filtered = (course.assignments || []).filter((assign) => {
+                    const sub = assign.submission;
+                    const isSubmitted = sub && (sub.status === "SUBMITTED" || sub.status === "EVALUATED");
+                    const isPastDue = new Date(assign.due_date) < new Date();
+                    
+                    if (assignmentFilter === "pending") {
+                      return !isSubmitted;
+                    }
+                    if (assignmentFilter === "submitted") {
+                      return isSubmitted;
+                    }
+                    if (assignmentFilter === "late") {
+                      return !isSubmitted && isPastDue;
+                    }
+                    if (assignmentFilter === "graded") {
+                      return sub && sub.status === "EVALUATED";
+                    }
+                    return true;
+                  });
+
+                  return filtered.length === 0 ? (
+                    <div className="text-gray-500 text-sm text-center py-8">No matching assignments found.</div>
+                  ) : (
+                    <div className="space-y-6">
+                      {filtered.map((assign) => {
+                        const getAssignmentStatus = (item) => {
+                          const sub = item.submission;
+                          if (sub) {
+                            if (sub.status === "EVALUATED") {
+                              return {
+                                label: `Evaluated (Grade: ${sub.grade})`,
+                                type: "success",
+                                isSubmitted: true
+                              };
+                            }
+                            if (sub.status === "SUBMITTED") {
+                              const isLateSub = new Date(sub.submitted_at) > new Date(item.due_date);
+                              return {
+                                label: isLateSub ? "Submitted (Late)" : "Submitted",
+                                type: isLateSub ? "warning" : "success",
+                                isSubmitted: true
+                              };
+                            }
                           }
-                          if (sub.status === "SUBMITTED") {
-                            const isLateSub = new Date(sub.submitted_at) > new Date(item.due_date);
-                            return {
-                              label: isLateSub ? "Submitted (Late)" : "Submitted",
-                              type: isLateSub ? "warning" : "success",
-                              isSubmitted: true
-                            };
-                          }
-                        }
-                        const isPastDue = new Date(item.due_date) < new Date();
-                        return {
-                          label: isPastDue ? "Late" : "Pending",
-                          type: isPastDue ? "danger" : "warning",
-                          isSubmitted: false
+                          const isPastDue = new Date(item.due_date) < new Date();
+                          return {
+                            label: isPastDue ? "Late" : "Pending",
+                            type: isPastDue ? "danger" : "warning",
+                            isSubmitted: false
+                          };
                         };
-                      };
 
-                      const statusInfo = getAssignmentStatus(assign);
-                      const formattedDueDate = new Date(assign.due_date).toLocaleDateString(undefined, {
-                        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                      });
-                      const formattedSubDate = assign.submission?.submitted_at ? new Date(assign.submission.submitted_at).toLocaleDateString(undefined, {
-                        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                      }) : null;
+                        const statusInfo = getAssignmentStatus(assign);
+                        const formattedDueDate = new Date(assign.due_date).toLocaleDateString(undefined, {
+                          weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                        });
+                        const formattedSubDate = assign.submission?.submitted_at ? new Date(assign.submission.submitted_at).toLocaleDateString(undefined, {
+                          year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                        }) : null;
 
-                      return (
-                        <div key={assign.id} className="p-5 border border-gray-200/80 rounded-xl bg-white shadow-xs space-y-4">
-                          <div className="flex flex-wrap items-start justify-between gap-4">
-                            <div className="space-y-1">
-                              <h3 className="font-bold text-gray-900 text-base sm:text-lg">{assign.title}</h3>
-                              <div className="flex items-center gap-1.5 text-xs text-gray-400 font-semibold">
-                                <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                <span>Due: {formattedDueDate}</span>
+                        return (
+                          <div key={assign.id} className="p-5 border border-gray-200/80 rounded-xl bg-white shadow-xs space-y-4 text-left">
+                            <div className="flex flex-wrap items-start justify-between gap-4">
+                              <div className="space-y-1">
+                                <h3 className="font-bold text-gray-900 text-base sm:text-lg">{assign.title}</h3>
+                                <div className="flex items-center gap-1.5 text-xs text-gray-400 font-semibold">
+                                  <svg className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <span>Due Date: {formattedDueDate}</span>
+                                </div>
                               </div>
+                              <Badge type={statusInfo.type} className="font-bold text-xs uppercase px-2.5 py-0.5">
+                                {statusInfo.label}
+                              </Badge>
                             </div>
-                            <Badge type={statusInfo.type} className="font-bold text-xs uppercase px-3 py-1">
-                              {statusInfo.label}
-                            </Badge>
-                          </div>
 
-                          {assign.description && (
-                            <p className="text-gray-600 text-sm leading-relaxed border-t border-gray-50 pt-3">
+                            <p className="text-gray-500 text-xs sm:text-sm leading-relaxed whitespace-pre-line text-left">
                               {assign.description}
                             </p>
-                          )}
 
-                          <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 flex flex-wrap items-center justify-between gap-4">
-                            <div className="text-xs text-gray-500 space-y-1 text-left">
-                              {statusInfo.isSubmitted ? (
-                                <>
-                                  <p>Submitted on: <span className="font-bold text-gray-700">{formattedSubDate}</span></p>
-                                  {assign.submission?.feedback && (
-                                    <div className="mt-2 pt-2 border-t border-slate-200/50">
-                                      <p className="font-bold text-gray-750">Instructor Feedback:</p>
-                                      <p className="text-gray-600 italic mt-0.5">"{assign.submission.feedback}"</p>
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <p className="font-semibold text-amber-600/80">Pending submission. Please submit before the due date.</p>
+                            <div className="flex flex-wrap items-center justify-between gap-4 pt-3.5 border-t border-gray-100 text-xs">
+                              <div className="text-gray-400 font-semibold text-left">
+                                {assign.submission ? (
+                                  <div className="space-y-1">
+                                    <p>
+                                      Submitted: <span className="font-bold text-gray-500">{formattedSubDate}</span>
+                                    </p>
+                                    {assign.submission.feedback && (
+                                      <p className="p-2.5 rounded-lg bg-slate-50 border border-gray-150 text-gray-600 mt-1">
+                                        <span className="font-bold block text-gray-700">Feedback:</span> {assign.submission.feedback}
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <p className="font-semibold text-amber-650">Pending submission. Please submit before the due date.</p>
+                                )}
+                              </div>
+
+                              {!statusInfo.isSubmitted && (
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  className="font-bold text-xs py-2 px-4 shadow-sm"
+                                  onClick={() => handleAssignSubmit(assign.id)}
+                                  loading={!!submitting[assign.id]}
+                                >
+                                  Submit Assignment
+                                </Button>
                               )}
                             </div>
-
-                            {!statusInfo.isSubmitted && (
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                className="font-bold text-xs py-2 px-4 shadow-sm"
-                                onClick={() => handleAssignSubmit(assign.id)}
-                                loading={!!submitting[assign.id]}
-                              >
-                                Submit Assignment
-                              </Button>
-                            )}
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </Card>
             )}
 
@@ -540,92 +702,133 @@ export default function CourseDetails() {
               <Card hover={false} className="p-8 border border-gray-150 rounded-2xl shadow-xs bg-white text-left">
                 <h2 className="text-xl font-bold text-gray-900 mb-6 tracking-tight">Live Classes</h2>
 
-                {!course.live_sessions || course.live_sessions.length === 0 ? (
-                  <div className="text-gray-500 text-sm text-center py-8">No live sessions scheduled for this course yet.</div>
-                ) : (
-                  <div className="space-y-6">
-                    {course.live_sessions.map((session) => {
-                      const statusInfo = getSessionStatus(session);
-                      
-                      const startDate = new Date(session.scheduled_at);
-                      const endDate = new Date(startDate.getTime() + session.duration_minutes * 60 * 1000);
-                      
-                      const formattedDate = startDate.toLocaleDateString(undefined, {
-                        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
-                      });
-                      const formattedStartTime = startDate.toLocaleTimeString(undefined, {
-                        hour: '2-digit', minute: '2-digit'
-                      });
-                      const formattedEndTime = endDate.toLocaleTimeString(undefined, {
-                        hour: '2-digit', minute: '2-digit'
-                      });
-
-                      const facultyName = course.faculty ? course.faculty.name : "Course Instructor";
-
-                      return (
-                        <div key={session.id} className="p-5 border border-gray-200/80 rounded-xl bg-white shadow-xs space-y-4">
-                          <div className="flex flex-wrap items-start justify-between gap-4">
-                            <div className="space-y-1 text-left">
-                              <h3 className="font-bold text-gray-900 text-base sm:text-lg">{session.title}</h3>
-                              <p className="text-xs text-gray-400 font-semibold flex items-center gap-1">
-                                <span className="uppercase text-purple-600 font-bold">Host:</span> {facultyName}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {statusInfo.isLive && (
-                                <span className="flex h-2.5 w-2.5 relative">
-                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                                </span>
-                              )}
-                              <Badge type={statusInfo.type} className="font-bold text-xs uppercase px-3 py-1">
-                                {statusInfo.label}
-                              </Badge>
-                            </div>
-                          </div>
-
-                          {/* Session details */}
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-3.5 border-y border-gray-50 text-sm text-gray-600">
-                            <div className="flex items-center gap-2 text-left">
-                              <svg className="h-4.5 w-4.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                              </svg>
-                              <span>{formattedDate}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-left">
-                              <svg className="h-4.5 w-4.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span>{formattedStartTime} - {formattedEndTime}</span>
-                            </div>
-                            <div className="flex items-center gap-2 text-left">
-                              <svg className="h-4.5 w-4.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              <span>{session.duration_minutes} Mins</span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
-                            <p className="text-gray-500 text-xs sm:text-sm max-w-md text-left leading-normal">
-                              Join this live interactive session with your instructor to review recent topics, ask questions, and clarify concepts.
-                            </p>
-                            
-                            <Button
-                              variant={statusInfo.isCompleted ? "secondary" : "primary"}
-                              size="sm"
-                              className="font-bold text-xs py-2 px-5 shadow-sm"
-                              disabled={statusInfo.isCompleted}
-                              onClick={() => handleJoinSession(session)}
-                            >
-                              {statusInfo.isCompleted ? "Ended" : "Join Meeting"}
-                            </Button>
-                          </div>
-                        </div>
-                      );
-                    })}
+                {/* Live Sessions local filters */}
+                <div className="mb-6 p-4 rounded-xl bg-slate-50 border border-gray-150 flex flex-wrap items-center justify-between gap-4 text-left">
+                  <div className="flex bg-gray-150 rounded-lg p-0.5 border border-gray-200/50">
+                    {["all", "upcoming", "live", "completed"].map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setLiveSessionFilter(f)}
+                        className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer capitalize ${
+                          liveSessionFilter === f ? "bg-white text-purple-650 shadow-xs" : "text-gray-500 hover:text-gray-700"
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
                   </div>
-                )}
+                  {liveSessionFilter !== "all" && (
+                    <button
+                      onClick={() => setLiveSessionFilter("all")}
+                      className="text-xs text-purple-650 hover:text-purple-800 font-bold cursor-pointer"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+
+                {(() => {
+                  const filtered = (course.live_sessions || []).filter((session) => {
+                    const statusInfo = getSessionStatus(session);
+                    if (liveSessionFilter === "upcoming") {
+                      return !statusInfo.isLive && !statusInfo.isCompleted;
+                    }
+                    if (liveSessionFilter === "live") {
+                      return statusInfo.isLive;
+                    }
+                    if (liveSessionFilter === "completed") {
+                      return statusInfo.isCompleted;
+                    }
+                    return true;
+                  });
+
+                  return filtered.length === 0 ? (
+                    <div className="text-gray-500 text-sm text-center py-8">No matching live sessions found.</div>
+                  ) : (
+                    <div className="space-y-6">
+                      {filtered.map((session) => {
+                        const statusInfo = getSessionStatus(session);
+                        
+                        const startDate = new Date(session.scheduled_at);
+                        const endDate = new Date(startDate.getTime() + session.duration_minutes * 60 * 1000);
+                        
+                        const formattedDate = startDate.toLocaleDateString(undefined, {
+                          weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+                        });
+                        const formattedStartTime = startDate.toLocaleTimeString(undefined, {
+                          hour: '2-digit', minute: '2-digit'
+                        });
+                        const formattedEndTime = endDate.toLocaleTimeString(undefined, {
+                          hour: '2-digit', minute: '2-digit'
+                        });
+
+                        const facultyName = course.faculty ? course.faculty.name : "Course Instructor";
+
+                        return (
+                          <div key={session.id} className="p-5 border border-gray-200/80 rounded-xl bg-white shadow-xs space-y-4 text-left">
+                            <div className="flex flex-wrap items-start justify-between gap-4">
+                              <div className="space-y-1 text-left">
+                                <h3 className="font-bold text-gray-900 text-base sm:text-lg">{session.title}</h3>
+                                <p className="text-xs text-gray-400 font-semibold flex items-center gap-1">
+                                  <span className="uppercase text-purple-600 font-bold">Host:</span> {facultyName}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {statusInfo.isLive && (
+                                  <span className="flex h-2.5 w-2.5 relative">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                                  </span>
+                                )}
+                                <Badge type={statusInfo.type} className="font-bold text-xs uppercase px-3 py-1">
+                                  {statusInfo.label}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* Session details */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-3.5 border-y border-gray-50 text-sm text-gray-600">
+                              <div className="flex items-center gap-2 text-left">
+                                <svg className="h-4.5 w-4.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                                <span>{formattedDate}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-left">
+                                <svg className="h-4.5 w-4.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>{formattedStartTime} - {formattedEndTime}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-left">
+                                <svg className="h-4.5 w-4.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>{session.duration_minutes} Mins</span>
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between gap-4 pt-1">
+                              <p className="text-gray-500 text-xs sm:text-sm max-w-md text-left leading-normal">
+                                Join this live interactive session with your instructor to review recent topics, ask questions, and clarify concepts.
+                              </p>
+                              
+                              <Button
+                                variant={statusInfo.isCompleted ? "secondary" : "primary"}
+                                size="sm"
+                                className="font-bold text-xs py-2 px-5 shadow-sm"
+                                disabled={statusInfo.isCompleted}
+                                onClick={() => handleJoinSession(session)}
+                              >
+                                {statusInfo.isCompleted ? "Ended" : "Join Meeting"}
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </Card>
             )}
           </div>

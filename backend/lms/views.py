@@ -694,4 +694,113 @@ class DashboardSummaryView(APIView):
         })
 
 
+class GlobalSearchView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        query = request.query_params.get("q", "").strip()
+        if not query or len(query) < 2:
+            return Response({
+                "courses": [],
+                "modules": [],
+                "materials": [],
+                "assignments": [],
+                "live_sessions": []
+            })
+
+        try:
+            student = request.user.student_profile
+        except (AttributeError, Student.DoesNotExist):
+            return Response(
+                {"detail": "Only students have access to course content search."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        from django.db import models
+        enrollments = Enrollment.objects.filter(student=student)
+        enrolled_courses = [e.course for e in enrollments]
+
+        # 1. Search Courses
+        courses_matches = Course.objects.filter(
+            id__in=[c.id for c in enrolled_courses]
+        ).filter(
+            models.Q(course_name__icontains=query) | models.Q(course_code__icontains=query)
+        )[:5]
+        
+        courses_data = [{
+            "id": c.id,
+            "title": c.course_name,
+            "code": c.course_code,
+            "type": "course"
+        } for c in courses_matches]
+
+        # 2. Search Modules
+        modules_matches = Module.objects.filter(
+            course__in=enrolled_courses,
+            title__icontains=query
+        ).select_related("course")[:5]
+        
+        modules_data = [{
+            "id": m.id,
+            "title": m.title,
+            "course_id": m.course.id,
+            "course_name": m.course.course_name,
+            "type": "module"
+        } for m in modules_matches]
+
+        # 3. Search Study Materials
+        materials_matches = StudyMaterial.objects.filter(
+            module__course__in=enrolled_courses,
+            title__icontains=query
+        ).select_related("module", "module__course")[:5]
+        
+        materials_data = [{
+            "id": sm.id,
+            "title": sm.title,
+            "material_type": sm.material_type,
+            "course_id": sm.module.course.id,
+            "course_name": sm.module.course.course_name,
+            "type": "material"
+        } for sm in materials_matches]
+
+        # 4. Search Assignments
+        assignments_matches = Assignment.objects.filter(
+            course__in=enrolled_courses,
+            title__icontains=query
+        ).select_related("course")[:5]
+        
+        assignments_data = [{
+            "id": a.id,
+            "title": a.title,
+            "course_id": a.course.id,
+            "course_name": a.course.course_name,
+            "type": "assignment"
+        } for a in assignments_matches]
+
+        # 5. Search Live Sessions
+        classrooms = Classroom.objects.filter(enrollments__student=student)
+        live_matches = LiveSession.objects.filter(
+            models.Q(course__in=enrolled_courses) &
+            (models.Q(classroom__in=classrooms) | models.Q(classroom__isnull=True))
+        ).filter(
+            title__icontains=query
+        ).select_related("course")[:5]
+        
+        live_data = [{
+            "id": ls.id,
+            "title": ls.title,
+            "course_id": ls.course.id,
+            "course_name": ls.course.course_name,
+            "type": "live_session"
+        } for ls in live_matches]
+
+        return Response({
+            "courses": courses_data,
+            "modules": modules_data,
+            "materials": materials_data,
+            "assignments": assignments_data,
+            "live_sessions": live_data
+        })
+
+
 

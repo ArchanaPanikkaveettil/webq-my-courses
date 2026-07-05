@@ -8,6 +8,7 @@ import Card from "../components/ui/Card";
 import ProgressBar from "../components/ui/ProgressBar";
 import Badge from "../components/ui/Badge";
 import Spinner from "../components/ui/Spinner";
+import GlobalSearch from "../components/common/GlobalSearch";
 
 // API Call: Fetch my courses
 const fetchMyCourses = () => api.get("my-courses/");
@@ -22,6 +23,7 @@ export default function Dashboard() {
 
   // UI preferences states
   const [searchQuery, setSearchQuery] = useState("");
+  const [courseFilter, setCourseFilter] = useState("all");
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem("dashboardViewMode") || "grid";
   });
@@ -55,11 +57,20 @@ export default function Dashboard() {
 
   // Filter & Sort Courses
   const filteredCourses = courses
-    ? courses.filter(
-        (course) =>
+    ? courses.filter((course) => {
+        const matchesSearch =
           course.course_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          course.course_code.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+          course.course_code.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        let matchesFilter = true;
+        if (courseFilter === "in_progress") {
+          matchesFilter = course.progress > 0 && course.progress < 100;
+        } else if (courseFilter === "completed") {
+          matchesFilter = course.progress === 100;
+        }
+        
+        return matchesSearch && matchesFilter;
+      })
     : [];
 
   const sortedCourses = [...filteredCourses].sort((a, b) => {
@@ -96,6 +107,11 @@ export default function Dashboard() {
               <span className="font-bold text-xl text-gray-900 tracking-tight">
                 My Courses <span className="text-purple-600">LMS</span>
               </span>
+            </div>
+
+            {/* Global Search Component */}
+            <div className="hidden md:flex flex-1 justify-center max-w-sm mx-4">
+              <GlobalSearch />
             </div>
 
             {/* Profile & Logout */}
@@ -268,6 +284,21 @@ export default function Dashboard() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200/80 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900"
             />
+          </div>
+
+          {/* Local Course Filters */}
+          <div className="flex bg-gray-150 rounded-lg p-0.5 border border-gray-200/50">
+            {["all", "in_progress", "completed"].map((f) => (
+              <button
+                key={f}
+                onClick={() => setCourseFilter(f)}
+                className={`px-3.5 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer capitalize ${
+                  courseFilter === f ? "bg-white text-purple-650 shadow-xs" : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                {f.replace("_", " ")}
+              </button>
+            ))}
           </div>
 
           {/* Toggle buttons */}
