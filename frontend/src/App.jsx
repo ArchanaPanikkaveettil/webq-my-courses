@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import CourseDetails from "./pages/CourseDetails";
 import Landing from "./pages/Landing";
 import Register from "./pages/Register";
+import Profile from "./pages/Profile";
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import PublicRoute from "./components/common/PublicRoute";
 
@@ -42,6 +43,14 @@ function App() {
           element={
             <ProtectedRoute>
               <CourseDetails />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           }
         />

@@ -17,6 +17,7 @@ from .views import (
     RegisterView,
     MeView,
     SubmitAssignmentView,
+    ChangePasswordView,
 )
 
 urlpatterns = [
@@ -25,6 +26,7 @@ urlpatterns = [
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("register/", RegisterView.as_view(), name="register"),
     path("me/", MeView.as_view(), name="me"),
+    path("change-password/", ChangePasswordView.as_view(), name="change-password"),
     path("assignments/<int:pk>/submit/", SubmitAssignmentView.as_view(), name="submit-assignment"),
 
     # Student personal course access APIs

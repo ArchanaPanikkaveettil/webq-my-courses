@@ -362,8 +362,29 @@ class MeView(APIView):
         try:
             student = user.student_profile
             student_id = student.student_id
+            profile_photo = student.profile_photo
         except Student.DoesNotExist:
             student_id = None
+            profile_photo = None
+
+        courses_data = []
+        if student_id:
+            enrollments = Enrollment.objects.filter(student=student)
+            for enrollment in enrollments:
+                course = enrollment.course
+                total_materials = StudyMaterial.objects.filter(module__course=course).count()
+                completed_materials = MaterialCompletion.objects.filter(
+                    student=student,
+                    material__module__course=course,
+                    completed=True
+                ).count()
+                progress = int((completed_materials / total_materials) * 100) if total_materials > 0 else 0
+                courses_data.append({
+                    "id": course.id,
+                    "course_name": course.course_name,
+                    "course_code": course.course_code,
+                    "progress": progress
+                })
 
         return Response({
             "username": user.username,
@@ -371,8 +392,105 @@ class MeView(APIView):
             "last_name": user.last_name,
             "email": user.email,
             "student_id": student_id,
+            "profile_photo": profile_photo,
+            "date_joined": user.date_joined,
+            "enrolled_courses": courses_data,
             "full_name": f"{user.first_name} {user.last_name}".strip() or user.username
         })
+
+    def patch(self, request):
+        user = request.user
+        email = request.data.get("email")
+        full_name = request.data.get("full_name")
+        profile_photo = request.data.get("profile_photo")
+
+        if email:
+            if User.objects.filter(email=email).exclude(pk=user.pk).exists():
+                return Response(
+                    {"detail": "Email is already in use by another account."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            user.email = email
+
+        if full_name:
+            parts = full_name.split(" ", 1)
+            user.first_name = parts[0]
+            user.last_name = parts[1] if len(parts) > 1 else ""
+
+        user.save()
+
+        try:
+            student = user.student_profile
+            if profile_photo is not None:
+                student.profile_photo = profile_photo
+                student.save()
+            student_id = student.student_id
+            profile_photo = student.profile_photo
+        except Student.DoesNotExist:
+            student_id = None
+            profile_photo = None
+
+        courses_data = []
+        if student_id:
+            enrollments = Enrollment.objects.filter(student=student)
+            for enrollment in enrollments:
+                course = enrollment.course
+                total_materials = StudyMaterial.objects.filter(module__course=course).count()
+                completed_materials = MaterialCompletion.objects.filter(
+                    student=student,
+                    material__module__course=course,
+                    completed=True
+                ).count()
+                progress = int((completed_materials / total_materials) * 100) if total_materials > 0 else 0
+                courses_data.append({
+                    "id": course.id,
+                    "course_name": course.course_name,
+                    "course_code": course.course_code,
+                    "progress": progress
+                })
+
+        return Response({
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+            "student_id": student_id,
+            "profile_photo": profile_photo,
+            "date_joined": user.date_joined,
+            "enrolled_courses": courses_data,
+            "full_name": f"{user.first_name} {user.last_name}".strip() or user.username
+        }, status=status.HTTP_200_OK)
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        current_password = request.data.get("current_password")
+        new_password = request.data.get("new_password")
+
+        if not current_password or not new_password:
+            return Response(
+                {"detail": "Current password and new password are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not user.check_password(current_password):
+            return Response(
+                {"detail": "Incorrect current password."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(new_password) < 6:
+            return Response(
+                {"detail": "New password must be at least 6 characters long."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user.set_password(new_password)
+        user.save()
+        return Response({"detail": "Password updated successfully."}, status=status.HTTP_200_OK)
 
 
 class SubmitAssignmentView(APIView):

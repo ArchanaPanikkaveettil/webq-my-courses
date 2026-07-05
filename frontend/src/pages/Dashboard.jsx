@@ -98,14 +98,35 @@ export default function Dashboard() {
 
             {/* Profile & Logout */}
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-sm border border-purple-200">
-                  {user?.full_name ? user.full_name[0].toUpperCase() : (user?.username ? user.username[0].toUpperCase() : "S")}
-                </div>
+              <div 
+                className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => navigate("/profile")}
+              >
+                {user?.profile_photo ? (
+                  <img
+                    src={user.profile_photo}
+                    alt={user.full_name || "Student"}
+                    className="h-8 w-8 rounded-full object-cover border border-purple-200"
+                  />
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-sm border border-purple-200">
+                    {user?.full_name ? user.full_name[0].toUpperCase() : (user?.username ? user.username[0].toUpperCase() : "S")}
+                  </div>
+                )}
                 <span className="hidden sm:inline text-sm font-semibold text-gray-700">
                   {user?.full_name || user?.username || "Student"}
                 </span>
               </div>
+              
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                className="font-semibold text-xs py-1.5" 
+                onClick={() => navigate("/profile")}
+              >
+                My Profile
+              </Button>
+
               <Button variant="secondary" size="sm" className="font-semibold text-xs py-1.5" onClick={handleLogout}>
                 Sign Out
               </Button>
