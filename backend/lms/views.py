@@ -14,6 +14,7 @@ from .models import (
     LiveSession,
     Enrollment,
     Classroom,
+    Notification,
 )
 
 from .serializers import (
@@ -23,6 +24,7 @@ from .serializers import (
     AssignmentSerializer,
     LiveSessionSerializer,
     MyCourseListSerializer,
+    NotificationSerializer,
 )
 
 
@@ -236,6 +238,13 @@ class ToggleMaterialCompletionView(APIView):
         if completion.completed:
             from django.utils import timezone
             completion.completed_at = timezone.now()
+            Notification.objects.create(
+                student=student,
+                title="Study Material Completed",
+                description=f"You completed '{material.title}' in course {course.course_name}.",
+                notification_type="MATERIAL_COMPLETED",
+                target_url=f"/courses/{course.id}"
+            )
         else:
             completion.completed_at = None
         completion.save()
@@ -424,6 +433,13 @@ class MeView(APIView):
             if profile_photo is not None:
                 student.profile_photo = profile_photo
                 student.save()
+            Notification.objects.create(
+                student=student,
+                title="Profile Updated Successfully",
+                description="Your student profile has been updated.",
+                notification_type="PROFILE_UPDATED",
+                target_url="/profile"
+            )
             student_id = student.student_id
             profile_photo = student.profile_photo
         except Student.DoesNotExist:
@@ -490,6 +506,17 @@ class ChangePasswordView(APIView):
 
         user.set_password(new_password)
         user.save()
+        try:
+            student = user.student_profile
+            Notification.objects.create(
+                student=student,
+                title="Security Password Updated",
+                description="Your student account password has been changed successfully.",
+                notification_type="PROFILE_UPDATED",
+                target_url="/profile"
+            )
+        except Exception:
+            pass
         return Response({"detail": "Password updated successfully."}, status=status.HTTP_200_OK)
 
 
@@ -538,6 +565,14 @@ class SubmitAssignmentView(APIView):
         submission.status = "SUBMITTED"
         submission.submitted_at = timezone.now()
         submission.save()
+
+        Notification.objects.create(
+            student=student,
+            title="Assignment Submitted Successfully",
+            description=f"Your assignment '{assignment.title}' was submitted for grading.",
+            notification_type="ASSIGNMENT_SUBMITTED",
+            target_url=f"/courses/{course.id}"
+        )
 
         return Response({
             "id": submission.id,
@@ -801,6 +836,157 @@ class GlobalSearchView(APIView):
             "assignments": assignments_data,
             "live_sessions": live_data
         })
+
+
+def generate_dynamic_notifications(student):
+    from django.utils import timezone
+    from django.db import models
+    
+    # 1. Enrolled courses
+    enrollments = Enrollment.objects.filter(student=student)
+    enrolled_courses = [e.course for e in enrollments]
+    if not enrolled_courses:
+        return
+        
+    now = timezone.now()
+    
+    # 2. Assignment deadlines due within 48 hours
+    soon_48h = now + timezone.timedelta(hours=48)
+    assignments = Assignment.objects.filter(
+        course__in=enrolled_courses,
+        due_date__gt=now,
+        due_date__lte=soon_48h
+    )
+    for assignment in assignments:
+        submitted = AssignmentSubmission.objects.filter(
+            assignment=assignment,
+            student=student,
+            status__in=["SUBMITTED", "EVALUATED"]
+        ).exists()
+        if not submitted:
+            title = f"Assignment Due Soon: {assignment.title}"
+            exists = Notification.objects.filter(
+                student=student,
+                notification_type="ASSIGNMENT_DUE",
+                title=title
+            ).exists()
+            if not exists:
+                Notification.objects.create(
+                    student=student,
+                    title=title,
+                    description=f"Your assignment '{assignment.title}' is due soon on {assignment.due_date.strftime('%b %d, %I:%M %p')}.",
+                    notification_type="ASSIGNMENT_DUE",
+                    target_url=f"/courses/{assignment.course.id}"
+                )
+
+    # 3. Live sessions upcoming within 24 hours
+    soon_24h = now + timezone.timedelta(hours=24)
+    live_sessions = LiveSession.objects.filter(
+        course__in=enrolled_courses,
+        scheduled_at__gt=now,
+        scheduled_at__lte=soon_24h
+    )
+    for session in live_sessions:
+        title = f"Upcoming Session: {session.title}"
+        exists = Notification.objects.filter(
+            student=student,
+            notification_type="LIVE_SESSION_UPCOMING",
+            title=title
+        ).exists()
+        if not exists:
+            Notification.objects.create(
+                student=student,
+                title=title,
+                description=f"The live class '{session.title}' starts in less than 24 hours on {session.scheduled_at.strftime('%b %d, %I:%M %p')}.",
+                notification_type="LIVE_SESSION_UPCOMING",
+                target_url=f"/courses/{session.course.id}"
+            )
+
+    # 4. Live sessions active now
+    classrooms = Classroom.objects.filter(enrollments__student=student)
+    sessions_live = LiveSession.objects.filter(
+        models.Q(course__in=enrolled_courses) &
+        (models.Q(classroom__in=classrooms) | models.Q(classroom__isnull=True))
+    )
+    for session in sessions_live:
+        start_time = session.scheduled_at
+        end_time = start_time + timezone.timedelta(minutes=session.duration_minutes)
+        if start_time <= now <= end_time:
+            title = f"Session Live Now: {session.title}"
+            exists = Notification.objects.filter(
+                student=student,
+                notification_type="LIVE_SESSION_LIVE",
+                title=title
+            ).exists()
+            if not exists:
+                Notification.objects.create(
+                    student=student,
+                    title=title,
+                    description=f"The live session '{session.title}' is currently live. Click to join the classroom!",
+                    notification_type="LIVE_SESSION_LIVE",
+                    target_url=f"/courses/{session.course.id}"
+                )
+
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            student = request.user.student_profile
+        except (AttributeError, Student.DoesNotExist):
+            return Response(
+                {"detail": "Only students have access to notifications."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        generate_dynamic_notifications(student)
+
+        notifications = Notification.objects.filter(student=student).order_by("-created_at")
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response(serializer.data)
+
+
+class MarkNotificationReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            student = request.user.student_profile
+        except (AttributeError, Student.DoesNotExist):
+            return Response(
+                {"detail": "Only students can modify notification status."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            notif = Notification.objects.get(pk=pk, student=student)
+        except Notification.DoesNotExist:
+            return Response(
+                {"detail": "Notification not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        notif.is_read = True
+        notif.save()
+        return Response({"detail": "Notification marked as read."}, status=status.HTTP_200_OK)
+
+
+class MarkAllNotificationsReadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            student = request.user.student_profile
+        except (AttributeError, Student.DoesNotExist):
+            return Response(
+                {"detail": "Only students can modify notification status."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        Notification.objects.filter(student=student, is_read=False).update(is_read=True)
+        return Response({"detail": "All notifications marked as read."}, status=status.HTTP_200_OK)
+
 
 
 

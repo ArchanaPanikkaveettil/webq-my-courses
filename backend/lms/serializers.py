@@ -11,6 +11,7 @@ from .models import (
     AssignmentSubmission,
     LiveSession,
     Student,
+    Notification,
 )
 
 
@@ -123,4 +124,10 @@ class AssignmentSubmissionSerializer(serializers.ModelSerializer):
 class LiveSessionSerializer(serializers.ModelSerializer):
     class Meta:
         model = LiveSession
+        fields = "__all__"
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
         fields = "__all__"

@@ -313,3 +313,29 @@ class LiveSession(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Notification(models.Model):
+    NOTIFICATION_TYPES = (
+        ("ASSIGNMENT_DUE", "Assignment Due Soon"),
+        ("ASSIGNMENT_SUBMITTED", "Assignment Submitted"),
+        ("MATERIAL_COMPLETED", "Study Material Completed"),
+        ("LIVE_SESSION_UPCOMING", "Live Session Upcoming"),
+        ("LIVE_SESSION_LIVE", "Live Session Live"),
+        ("PROFILE_UPDATED", "Profile Updated"),
+    )
+
+    student = models.ForeignKey(
+        Student,
+        on_delete=models.CASCADE,
+        related_name="notifications"
+    )
+    title = models.CharField(max_length=200)
+    description = models.TextField()
+    notification_type = models.CharField(max_length=50, choices=NOTIFICATION_TYPES)
+    target_url = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_read = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.student.user.username} - {self.title} - Read: {self.is_read}"

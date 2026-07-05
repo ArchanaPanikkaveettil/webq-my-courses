@@ -9,6 +9,7 @@ import ProgressBar from "../components/ui/ProgressBar";
 import Badge from "../components/ui/Badge";
 import Spinner from "../components/ui/Spinner";
 import GlobalSearch from "../components/common/GlobalSearch";
+import NotificationBell from "../components/common/NotificationBell";
 
 // API Call: Fetch my courses
 const fetchMyCourses = () => api.get("my-courses/");
@@ -116,6 +117,8 @@ export default function Dashboard() {
 
             {/* Profile & Logout */}
             <div className="flex items-center gap-4">
+              <NotificationBell />
+
               <div 
                 className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
                 onClick={() => navigate("/profile")}

@@ -20,6 +20,9 @@ from .views import (
     ChangePasswordView,
     DashboardSummaryView,
     GlobalSearchView,
+    NotificationListView,
+    MarkNotificationReadView,
+    MarkAllNotificationsReadView,
 )
 
 urlpatterns = [
@@ -32,6 +35,9 @@ urlpatterns = [
     path("assignments/<int:pk>/submit/", SubmitAssignmentView.as_view(), name="submit-assignment"),
     path("dashboard-summary/", DashboardSummaryView.as_view(), name="dashboard-summary"),
     path("search/", GlobalSearchView.as_view(), name="global-search"),
+    path("notifications/", NotificationListView.as_view(), name="notification-list"),
+    path("notifications/<int:pk>/read/", MarkNotificationReadView.as_view(), name="notification-read"),
+    path("notifications/read-all/", MarkAllNotificationsReadView.as_view(), name="notifications-read-all"),
 
     # Student personal course access APIs
     path("my-courses/", MyCoursesListView.as_view(), name="my-courses-list"),
