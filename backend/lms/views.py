@@ -1012,14 +1012,6 @@ class MarkAllNotificationsReadView(APIView):
         return Response({"detail": "All notifications marked as read."}, status=status.HTTP_200_OK)
 
 
-class TempResetAdminView(APIView):
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        import os
-        db_url = os.environ.get("DATABASE_URL", "not set")
-        return Response({"db_url": db_url})
-
 
 
 
